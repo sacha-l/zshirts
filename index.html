@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZSHIRTS: a shirt that carries a secret message</title>
+<meta name="description" content="This shirt carries an encrypted message on the Zcash blockchain. The page holds most of the key. The shirt holds the rest.">
+<meta name="theme-color" content="#FAFAF7">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #FAFAF7;
+    --card: #FFFFFF;
+    --ink: #1F1D1B;
+    --muted: #625E59;
+    --line: #E3E0DA;
+    --accent: #3B3BB3;
+    --accent-soft: #E7E7FA;
+    --bad: #B42318;
+    --ok: #1E7B3A;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 16px/1.55 var(--sans); -webkit-text-size-adjust: 100%; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 56px; display: flex; flex-direction: column; gap: 24px; }
+  h1 { margin: 0; font-size: clamp(28px, 7vw, 38px); line-height: 1.15; }
+  h2 { margin: 0; font-size: 20px; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+  #tee svg { width: 100%; height: auto; display: block; border-radius: 10px; }
+  .cipher-fallback { margin: 0; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font: 14px/1.8 var(--mono); word-break: break-all; white-space: pre-wrap; }
+  .toggle { appearance: none; background: none; border: 0; padding: 4px 0; align-self: flex-start; color: var(--accent); font: 600 15px/1.4 var(--sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .explain { background: var(--accent-soft); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+
+  .keyview { font: 13px/1.7 var(--mono); word-break: break-all; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .slot { background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: 3px; padding: 0 2px; margin: 0 1px; white-space: pre; }
+  label { font-weight: 600; font-size: 15px; }
+  .piece-input { width: 100%; min-height: 52px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: 700 clamp(18px, 5.5vw, 22px)/1.2 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+  .piece-input:focus { border-color: var(--accent); outline: none; }
+  .counter { align-self: flex-end; font-size: 13px; color: var(--muted); margin-top: -8px; }
+  .msg { min-height: 22px; font-size: 14px; color: var(--muted); }
+  .msg.bad { color: var(--bad); }
+
+  .btn { appearance: none; width: 100%; min-height: 52px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: 700 17px/1 var(--sans); cursor: pointer; }
+  .btn[disabled] { background: #B9B8C9; cursor: not-allowed; }
+  .btn.ghost { width: auto; min-height: 40px; padding: 0 16px; background: none; color: var(--accent); border: 2px solid var(--accent); font-size: 15px; align-self: flex-start; }
+
+  .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+  .log li { display: grid; grid-template-columns: 22px 1fr; column-gap: 8px; color: var(--muted); }
+  .log .mark { font-weight: 700; text-align: center; }
+  .log .t { font-weight: 600; }
+  .log .d { grid-column: 2; font-size: 13px; }
+  .log li.active { color: var(--ink); }
+  .log li.done { color: var(--ink); }
+  .log li.done .mark { color: var(--ok); }
+  .log li.fail, .log li.fail .mark { color: var(--bad); }
+
+  .reveal { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .memo { font-size: clamp(22px, 5.5vw, 28px); font-weight: 800; line-height: 1.25; }
+  .problem { border: 1px solid var(--bad); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .problem h2 { color: var(--bad); font-size: 17px; }
+
+  ul.links { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  ol.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+  details { border-top: 1px solid var(--line); padding-top: 12px; }
+  summary { cursor: pointer; font-weight: 600; min-height: 40px; display: flex; align-items: center; }
+  details > div { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+  .field-label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .row { display: flex; gap: 8px; }
+  .value { flex: 1; min-width: 0; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; font: 12px/1.5 var(--mono); word-break: break-all; }
+  .copy { appearance: none; border: 2px solid var(--ink); background: var(--card); color: var(--ink); border-radius: 6px; font: 600 14px var(--sans); min-width: 72px; min-height: 44px; cursor: pointer; }
+  .copy[disabled] { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+  footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">ZSHIRTS</div>
+    <h1>This shirt carries a secret message.</h1>
+    <p class="muted" id="lead" style="margin-top:10px">It's written on the Zcash blockchain, encrypted. This page holds most of the key that can read it. The last 16 characters are printed on the shirt.</p>
+  </header>
+
+  <section id="ciphertext" style="display:flex; flex-direction:column; gap:10px">
+    <div id="tee"></div>
+    <pre class="cipher-fallback" id="cipher" hidden></pre>
+    <button class="toggle" type="button" data-toggle="what-cipher" aria-expanded="false">What am I looking at?</button>
+    <div class="explain" id="what-cipher" hidden>
+      <p>The characters on the shirt are the message, encrypted, exactly as it sits on the Zcash blockchain. Every pair (like BD) is one letter, scrambled.</p>
+      <p>Without the key it's noise. With the shirt's viewing key, your phone works out this note's secret, unscrambles each byte, and the letters fall back into place.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <section class="problem" id="setup" hidden>
+      <h2>Not set up yet</h2>
+      <p class="muted">This decoder has no transaction or key yet.</p>
+    </section>
+
+    <div id="complete" hidden style="display:flex; flex-direction:column; gap:12px">
+      <h2>Complete the key</h2>
+      <button class="toggle" type="button" data-toggle="what-vk" aria-expanded="false">What's a viewing key?</button>
+      <div class="explain" id="what-vk" hidden>
+        <p>A read-only key to a Zcash address. It can see what that address received (like this message) but it can't spend a single coin.</p>
+        <p>Sharing it is like letting someone read your mail, not open your wallet.</p>
+      </div>
+      <div class="keyview" id="keyview" aria-label="The viewing key, with 16 characters missing"></div>
+      <label for="piece">Type the 16 characters printed on the shirt</label>
+      <input class="piece-input" id="piece" type="text" placeholder="XXXX XXXX XXXX XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-describedby="counter key-msg">
+      <span class="counter" id="counter" aria-live="polite">0 / 16</span>
+      <p class="msg" id="key-msg" role="status" aria-live="polite"></p>
+    </div>
+
+    <button class="btn" id="go" type="button">Decrypt memo</button>
+    <p class="msg" id="status" role="status" aria-live="polite"></p>
+
+    <ol class="log" id="flow" hidden aria-live="polite">
+      <li><span class="mark">·</span><span class="t">Key assembled</span><span class="d" id="flow-d0"></span></li>
+      <li><span class="mark">·</span><span class="t">Key checks out</span><span class="d" id="flow-d1">A built-in checksum confirms every character.</span></li>
+      <li><span class="mark">·</span><span class="t">Note found</span><span class="d">The key belongs to the shirt's address, so it can spot the one note sent there in this transaction.</span></li>
+      <li><span class="mark">·</span><span class="t">Memo unlocked</span><span class="d">The key opens the note and the message pops out, right here on your phone. Nobody else saw a thing.</span></li>
+    </ol>
+
+    <section class="reveal" id="reveal" hidden aria-live="polite">
+      <p class="memo" id="memo"></p>
+      <p class="muted" id="credit" hidden></p>
+      <p class="muted small">Decrypted right here in your browser with the shirt's viewing key. Nothing about you was sent anywhere.</p>
+    </section>
+
+    <section class="problem" id="problem" hidden>
+      <h2>That didn't work here</h2>
+      <p id="problem-text"></p>
+      <button class="btn ghost" id="retry" type="button">Try again</button>
+    </section>
+  </section>
+
+  <section style="display:flex; flex-direction:column; gap:10px">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li>This page holds most of a Zcash viewing key. The shirt holds the last 16 characters. Together they make the whole key.</li>
+      <li>A viewing key can read what a wallet received. It can never spend. The wearer chose to share it with you.</li>
+      <li>Your 16 characters complete the key, and its checksum confirms them (one typo gets fixed). The key finds the note sent to the shirt's address and unscrambles the bytes printed on the shirt.</li>
+      <li>The key is scrambled before it's written out, so those 16 characters aren't one particular part of it. The page needs every character of it.</li>
+    </ol>
+  </section>
+
+  <section id="source" style="display:flex; flex-direction:column; gap:10px">
+    <h2>Open source</h2>
+    <p>This page is open source. Read every line, see how it works, and run it yourself. Nothing you type leaves your phone. The code shows it.</p>
+    <ul class="links">
+      <li><a href="https://github.com/sacha-l/zshirts#readme" target="_blank" rel="noopener">How it works and how to run it (README) ↗</a></li>
+      <li><a href="https://github.com/sacha-l/zshirts/blob/main/index.html" target="_blank" rel="noopener">View this page's code ↗</a></li>
+      <li><a href="https://github.com/sacha-l/zshirts/blob/main/bech32m.mjs" target="_blank" rel="noopener">bech32m.mjs</a>: completes the key and fixes a typo</li>
+      <li><a href="https://github.com/sacha-l/zshirts/blob/main/tee.js" target="_blank" rel="noopener">tee.js</a>: draws the shirt</li>
+    </ul>
+  </section>
+
+  <details id="verify">
+    <summary>Check it yourself</summary>
+    <div>
+      <p class="muted small">Copy both values into an independent decrypt tool and press decrypt.</p>
+      <div>
+        <div class="field-label">Transaction ID</div>
+        <div class="row"><div class="value" id="txid">—</div><button class="copy" type="button" data-copy="txid">Copy</button></div>
+      </div>
+      <div>
+        <div class="field-label">Viewing key</div>
+        <div class="row"><div class="value" id="ufvk">—</div><button class="copy" type="button" data-copy="ufvk" id="ufvk-copy">Copy</button></div>
+      </div>
+      <a id="tool-link" href="https://zecblock.com/decrypt" target="_blank" rel="noopener">Open the decrypt tool ↗</a>
+    </div>
+  </details>
+
+  <footer>Money can work like this too: private by default, shared when you choose. <a href="https://z.cash" target="_blank" rel="noopener">About Zcash ↗</a></footer>
+</main>
+
+<script type="module">
+import init, { decrypt_memo } from "./zcash_wasm.js";
+import { normalisePiece, completeKey } from "./bech32m.mjs";
+import { renderTee } from "./tee.js";
+
+// The address printed on the shirt.
+const SHIRT_URL = "key.joinwebzero.com";
+
+const $ = (id) => document.getElementById(id);
+const API = { mainnet: "https://api.zecblock.com", testnet: "https://api.testnet.zecblock.com" };
+const TOOL = { mainnet: "https://zecblock.com/decrypt", testnet: "https://testnet.zecblock.com/decrypt" };
+const KNOWN_BRANCH_IDS = ["00000000", "191ba85b", "bb09b876", "602bb42b", "0b23b9f5", "a675ffe9", "b4d0d6c2"];
+let cfg = null;
+let split = false;   // shirt.json has a "key" object: the reader completes the key
+let teeOn = false;   // the shirt drawing is shown (needs memoCiphertext)
+let finished = false, busy = false;
+
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const pause = (ms = 550) => new Promise((r) => setTimeout(r, reduceMotion() ? 0 : ms));
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+
+// Same patch the open-source explorer applies: newer upgrades keep the v5 layout.
+function patchBranchId(hex) {
+  if (hex.length < 24) return hex;
+  const id = hex.substring(16, 24);
+  return KNOWN_BRANCH_IDS.includes(id) ? hex : hex.substring(0, 16) + "b4d0d6c2" + hex.substring(24);
+}
+
+// Fallback display when there's no memoCiphertext: the slice of the transaction with the fewest zero groups.
+function densestSlice(hex, len) {
+  let best = 0, bestZeros = Infinity;
+  for (let i = 0; i + len <= hex.length; i += 4) {
+    const zeros = (hex.slice(i, i + len).match(/0000/g) || []).length;
+    if (zeros < bestZeros) { bestZeros = zeros; best = i; }
+  }
+  return hex.slice(best, best + len);
+}
+
+async function loadConfig() {
+  const res = await fetch("./shirt.json", { cache: "no-store" });
+  if (!res.ok) throw new Error("config");
+  const c = await res.json();
+  const q = new URLSearchParams(location.search); // ?tx=…&key=… overrides, for testing
+  if (q.get("tx")) { c.txid = q.get("tx").trim(); c.rawHex = ""; }
+  if (q.get("key")) { c.ufvk = q.get("key").trim(); delete c.key; }
+  c.network = c.network === "testnet" ? "testnet" : "mainnet";
+  return c;
+}
+
+async function getRawHex() {
+  if (cfg.rawHex) return cfg.rawHex.trim();
+  let res;
+  try { res = await fetch(`${API[cfg.network]}/v1/transactions/${cfg.txid}/raw`); }
+  catch { throw new Error("network"); }
+  if (res.status === 404) throw new Error("not-found");
+  if (!res.ok) throw new Error("network");
+  const body = await res.json();
+  const hex = body?.data?.hex ?? body?.hex;
+  if (!hex) throw new Error("network");
+  return hex;
+}
+
+function setStatus(text) { $("status").textContent = text; }
+function showProblem(text) { $("problem-text").textContent = text; $("problem").hidden = false; }
+
+function explainError(e) {
+  const msg = String(e && e.message ? e.message : e);
+  setStatus("");
+  if (msg === "network") showProblem("We couldn't reach the blockchain right now. Check your connection and try again, or decrypt it yourself below.");
+  else if (msg === "not-found") showProblem("The transaction wasn't found. The shirt's owner may need to update this page.");
+  else if (/Sapling/i.test(msg)) showProblem("This transaction uses an older pool this decoder can't read. The shirt's owner needs to resend the memo from shielded funds.");
+  else if (/UFVK|decode failed/i.test(msg)) showProblem("The viewing key on this page isn't valid. The shirt's owner needs to check the setup.");
+  else if (/No memo|doesn't match/i.test(msg)) showProblem("The key doesn't match this transaction. The shirt's owner needs to check the setup.");
+  else showProblem("Your browser couldn't run the decryption. Try another browser, or decrypt it yourself below.");
+}
+
+// ---- The split key ------------------------------------------------------------------
+// The piece is never shown except as the reader's own typing, and the completed key lives
+// only in cfg.ufvk, in memory: never storage, the URL or the console.
+
+function keyWithGap(typed) {
+  const frag = document.createDocumentFragment();
+  frag.append(el("span", "", cfg.key.head));
+  for (let g = 0; g < 4; g++) frag.append(el("span", "slot", (typed.slice(g * 4, g * 4 + 4).toUpperCase() + "____").slice(0, 4)));
+  frag.append(el("span", "", cfg.key.tail));
+  return frag;
+}
+
+function typedSoFar() {
+  const { piece, bad } = normalisePiece($("piece").value);
+  return [...piece].filter((c) => !bad.includes(c)).join("").slice(0, cfg.key.missing);
+}
+
+function showKeyFields(complete) {
+  $("ufvk").replaceChildren(keyWithGap(typedSoFar()));
+  $("ufvk-copy").disabled = !complete;
+}
+
+function drawTee(extra = {}) {
+  if (!teeOn) return;
+  renderTee($("tee"), { cipherHex: cfg.memoCiphertext, pieceLength: split ? cfg.key.missing : 16, typed: split ? typedSoFar() : "", url: SHIRT_URL, ...extra });
+}
+
+function setKeyMsg(text, bad = false) { $("key-msg").textContent = text; $("key-msg").classList.toggle("bad", bad); }
+
+function onPieceInput() {
+  if (cfg.ufvk) return; // already complete
+  const { piece, bad } = normalisePiece($("piece").value);
+  $("keyview").replaceChildren(keyWithGap(typedSoFar()));
+  showKeyFields(false);
+  drawTee();
+  $("counter").textContent = `${piece.length} / 16`;
+  if (bad.length) setKeyMsg(`"${bad[0]}" isn't on the shirt. The key never uses 1, b, i or o here.`, true);
+  else setKeyMsg("");
+  $("go").disabled = !(bad.length === 0 && piece.length === 16);
+}
+
+// Returns the completeKey result once cfg.ufvk holds the key, else null.
+function completeFromInput() {
+  if (cfg.ufvk) return { key: cfg.ufvk, fixedAt: null };
+  const { piece, bad } = normalisePiece($("piece").value);
+  if (bad.length || piece.length !== 16) return null;
+  const done = completeKey(cfg.key.head, piece, cfg.key.tail);
+  if (!done) {
+    setKeyMsg("That doesn't complete the key. Check the characters on the shirt.", true);
+    $("piece").focus();
+    return null;
+  }
+  cfg.ufvk = done.key;
+  const fixed = done.fixedAt ? `We fixed one character for you (number ${done.fixedAt}). ` : "";
+  setKeyMsg(`${fixed}Key complete.`);
+  $("piece").readOnly = true;
+  $("counter").textContent = "16 / 16";
+  showKeyFields(true);
+  return done;
+}
+
+// ---- The decrypt steps --------------------------------------------------------------
+
+const MARK = { active: "…", done: "✓", fail: "✕" };
+const steps = () => [...$("flow").children];
+function setStep(i, state) {
+  const li = steps()[i];
+  li.classList.remove("active", "done", "fail");
+  if (state) li.classList.add(state);
+  li.querySelector(".mark").textContent = MARK[state] || "·";
+}
+
+// The shirt's bytes flip into the sentence, one by one.
+function flipShirt(memo) {
+  if (!teeOn) return Promise.resolve();
+  const n = Math.min(memo.length, cfg.memoCiphertext.length / 2);
+  if (reduceMotion()) { drawTee({ plain: memo, revealed: n }); return Promise.resolve(); }
+  return new Promise((done) => {
+    let i = 0;
+    const step = () => { if (i < n) { drawTee({ plain: memo, revealed: ++i }); setTimeout(step, 32); } else done(); };
+    step();
+  });
+}
+
+function showMemo(memo) {
+  $("memo").textContent = memo;
+  const c = (cfg.memoCredit || "").trim();
+  $("credit").textContent = c ? `— ${c}` : "";
+  $("credit").hidden = !c;
+  $("reveal").hidden = false;
+}
+
+async function decrypt() {
+  if (finished || busy || $("go").disabled) return;
+  busy = true;
+  $("go").disabled = true;
+  $("problem").hidden = true;
+  $("flow").hidden = false;
+  steps().forEach((_, i) => setStep(i, null));
+  try {
+    if (split) {
+      $("flow-d0").textContent = `This page's ${cfg.key.head.length + cfg.key.tail.length} characters + your 16 = the shirt's full viewing key.`;
+      $("flow-d1").textContent = "A built-in checksum confirms every character.";
+      setStep(0, "active");
+      await pause();
+      setStep(0, "done");
+      setStep(1, "active");
+      await pause();
+      const done = completeFromInput();
+      if (!done) { setStep(1, "fail"); $("flow-d1").textContent = "The checksum says something's off. Check the characters on the shirt."; return; }
+      if (done.fixedAt) $("flow-d1").textContent = "A built-in checksum confirms every character (and spotted one typo, now fixed).";
+      setStep(1, "done");
+    } else {
+      $("flow-d0").textContent = "This page holds the shirt's full viewing key.";
+      setStep(0, "done");
+      setStep(1, "done");
+    }
+
+    setStep(2, "active");
+    let memo = "";
+    try {
+      const hex = await getRawHex();
+      await init();
+      const [result] = await Promise.all([Promise.resolve().then(() => JSON.parse(decrypt_memo(patchBranchId(hex), cfg.ufvk))), pause()]);
+      memo = (result.memo || "").trim();
+      if (!memo) throw new Error("No memo found");
+    } catch (e) { setStep(2, "fail"); explainError(e); return; }
+    setStep(2, "done");
+
+    setStep(3, "active");
+    await flipShirt(memo);
+    showMemo(memo);
+    setStep(3, "done");
+    finished = true;
+    $("go").textContent = "Memo decrypted ✓";
+  } finally {
+    busy = false;
+    if (split) {
+      const { piece, bad } = normalisePiece($("piece").value);
+      $("go").disabled = finished || (!cfg.ufvk && (bad.length > 0 || piece.length !== 16));
+    } else $("go").disabled = finished;
+  }
+}
+
+// ---- Copy and toggles -----------------------------------------------------------------
+
+async function copyField(id, btn) {
+  // Split key: the viewing-key field shows only the reader's typing; copy the completed key from memory.
+  const fromMemory = split && id === "ufvk";
+  if (fromMemory && !cfg.ufvk) return;
+  const text = fromMemory ? cfg.ufvk : $(id).textContent;
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const t = document.createElement("textarea");
+    t.value = text; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.append(t); t.select();
+    try { document.execCommand("copy"); } catch {}
+    t.remove();
+  }
+  btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1500);
+}
+
+function setupToggles() {
+  document.querySelectorAll("[data-toggle]").forEach((btn) => {
+    btn.setAttribute("aria-controls", btn.dataset.toggle);
+    btn.addEventListener("click", () => {
+      const open = btn.getAttribute("aria-expanded") !== "true";
+      btn.setAttribute("aria-expanded", String(open));
+      $(btn.dataset.toggle).hidden = !open;
+    });
+  });
+}
+
+(async () => {
+  setupToggles();
+  $("go").addEventListener("click", decrypt);
+  $("retry").addEventListener("click", decrypt);
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => copyField(b.dataset.copy, b)));
+
+  try { cfg = await loadConfig(); }
+  catch { showProblem("This page couldn't load its settings."); $("go").disabled = true; return; }
+
+  split = !!(cfg.key && typeof cfg.key === "object");
+  const ready = /^[0-9a-f]{64}$/i.test(cfg.txid) && (split
+    ? cfg.key.missing === 16 && /^uview/.test(cfg.key.head || "") && typeof cfg.key.tail === "string"
+    : /^uview/.test(cfg.ufvk || ""));
+  if (!ready) { $("setup").hidden = false; $("go").disabled = true; return; }
+
+  $("txid").textContent = cfg.txid;
+  $("tool-link").href = TOOL[cfg.network];
+
+  // The shirt, or the old text box if there's no exact memo ciphertext.
+  if (/^[0-9a-f]+$/i.test(cfg.memoCiphertext || "")) { teeOn = true; drawTee(); }
+  else {
+    $("tee").hidden = true;
+    $("cipher").hidden = false;
+    $("cipher").textContent = (cfg.rawHex ? densestSlice(cfg.rawHex, 192) : cfg.txid).toUpperCase().match(/.{1,4}/g).join(" ");
+  }
+
+  if (split) {
+    cfg.ufvk = "";
+    $("complete").hidden = false;
+    $("keyview").replaceChildren(keyWithGap(""));
+    showKeyFields(false);
+    $("go").disabled = true;
+    $("piece").addEventListener("input", onPieceInput);
+    $("piece").addEventListener("keydown", (e) => { if (e.key === "Enter" && !$("go").disabled) { e.preventDefault(); decrypt(); } });
+  } else {
+    $("ufvk").textContent = cfg.ufvk;
+    $("lead").textContent = "It's written on the Zcash blockchain, encrypted. This page holds the key that can read it.";
+  }
+})();
+</script>
+</body>
+</html>

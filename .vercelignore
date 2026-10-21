@@ -1,0 +1,14 @@
+# Whitelist: ignore everything, then allow only the files the page needs.
+# Never deployed: shirt.private.json (full key, piece, memo), tools/, docs/, net/, README, briefs.
+/*
+!/index.html
+!/raw.html
+!/bech32m.mjs
+!/tee.js
+!/fonts
+!/fonts/**
+!/shirt.json
+!/zcash_wasm.js
+!/zcash_wasm_bg.wasm
+!/LICENSE-cipherscan.txt
+shirt.private.json

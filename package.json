@@ -1,0 +1,10 @@
+{
+  "name": "zshirts",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tools/bech32m.test.mjs && node tools/test.mjs",
+    "compare-live": "node tools/compare-live.mjs"
+  }
+}

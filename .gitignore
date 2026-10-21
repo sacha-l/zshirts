@@ -1,0 +1,11 @@
+# Private: the full viewing key, the 16 characters and the memo. Never commit or deploy.
+shirt.private.json
+**/shirt.private.json
+.env
+.env.*
+
+# Local
+.vercel/
+.DS_Store
+qr.png
+qr.svg
