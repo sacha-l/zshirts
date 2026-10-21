@@ -422,7 +422,7 @@ async function decrypt() {
   steps().forEach((_, i) => setStep(i, null));
   try {
     if (split) {
-      $("flow-d0").textContent = `This page's ${cfg.key.head.length + cfg.key.tail.length} characters + your 16 = the shirt's full viewing key.`;
+      $("flow-d0").textContent = `This page's ${cfg.key.head.length + cfg.key.tail.length} characters + the 16 from the shirt = the full viewing key (${cfg.key.head.length + cfg.key.tail.length + 16} characters).`;
       $("flow-d1").textContent = "A built-in checksum confirms every character.";
       setStep(0, "active");
       await pause();
@@ -434,7 +434,7 @@ async function decrypt() {
       if (done.fixedAt) $("flow-d1").textContent = "A built-in checksum confirms every character (and spotted one typo, now fixed).";
       setStep(1, "done");
     } else {
-      $("flow-d0").textContent = "This page holds the shirt's full viewing key.";
+      $("flow-d0").textContent = "This page holds the full viewing key.";
       setStep(0, "done");
       setStep(1, "done");
     }
