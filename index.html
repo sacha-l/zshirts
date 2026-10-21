@@ -55,6 +55,9 @@
   .bubble .eq { display: block; margin-top: 3px; padding: 4px 8px; background: var(--accent-soft); border-radius: 5px; font: 13px/1.5 var(--mono); color: var(--ink); overflow-x: auto; white-space: nowrap; }
   .bubble var { font-family: var(--mono); font-style: normal; font-weight: 700; color: var(--accent); }
   .bubble .aside { color: var(--muted); font-size: 13px; }
+  .bubble .eq.bits { white-space: pre; }
+  .bubble code { font: 700 13px var(--mono); color: var(--accent); }
+  .bubble h3 + p, .bubble h3 + ol { margin-top: -4px; }
 
   .keyview { font: 13px/1.7 var(--mono); word-break: break-all; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
   .slot { background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: 3px; padding: 0 2px; margin: 0 1px; white-space: pre; }
@@ -111,25 +114,32 @@
     <div class="tip-row">
       <span class="tip-label">The characters on the shirt are the message</span>
       <span class="info">
-        <button class="info-btn" type="button" aria-label="How is the message encrypted?" aria-expanded="false" aria-controls="tip-cipher">i</button>
+        <button class="info-btn" type="button" aria-label="What's printed on the shirt, and how is it locked?" aria-expanded="false" aria-controls="tip-cipher">i</button>
         <div class="bubble" id="tip-cipher" role="note">
-          <h3>The shirt prints the message, locked</h3>
-          <p>It's printed exactly as it sits on the Zcash blockchain. Every pair of characters is one byte in hex, so one letter. Here's how it got locked:</p>
+          <h3>Two things are printed on the shirt</h3>
+          <p><b>The lines of characters are the message, locked.</b> Every pair, like <code>BD</code>, is one letter.</p>
+          <p><b>The four boxes hold the last 16 characters of the viewing key.</b> A viewing key is one long code, nearly 200 characters. This page has all of it except the end, and the shirt has the end. Neither half opens anything alone.</p>
+          <h3>How one letter gets locked</h3>
           <ol>
-            <li><b>The sender rolls a secret number.</b> Their wallet picks a random <var>e</var> and puts a public hint in the transaction:
-              <span class="eq">E = e·G</span></li>
-            <li><b>Both sides reach the same secret.</b> The shirt's address has a public key <var>P = v·G</var>, where <var>v</var> lives in the viewing key. The sender uses <var>e</var>, the key holder uses <var>v</var>, and they land on the same point:
-              <span class="eq">S = e·P = e·v·G = v·E</span></li>
-            <li><b>That secret becomes a key.</b>
-              <span class="eq">K = BLAKE2b(S, E)</span></li>
-            <li><b>The key becomes a stream of noise.</b> ChaCha20 turns <var>K</var> into random-looking bytes <var>k₁ k₂ k₃ …</var>, and each letter is XORed with one:
-              <span class="eq">c = m ⊕ k</span>
-              <span class="eq">Z = 5A,&nbsp; k = 3C &nbsp;→&nbsp; 5A ⊕ 3C = 66</span></li>
-            <li><b>A seal goes on.</b> A 16-byte tag (Poly1305) proves nobody changed a byte.</li>
+            <li><b>A letter is a number.</b> A computer stores <code>Z</code> as 90, written in hex (digits 0–9 and A–F) as <code>5A</code>.</li>
+            <li><b>The sender makes secret noise.</b> Their wallet uses <a href="https://en.wikipedia.org/wiki/Salsa20#ChaCha_variant" target="_blank" rel="noopener">ChaCha20</a> to make a stream of random-looking numbers that only this viewing key can make again. Say the next one is <code>3C</code>.</li>
+            <li><b>Mix the two.</b> Line up their bits and write 1 wherever they differ (this is called XOR):
+              <span class="eq bits">Z      5A = 0101 1010
+noise  3C = 0011 1100
+locked 66 = 0110 0110</span></li>
+            <li><b><code>66</code> goes on the blockchain, and on the shirt.</b> Every letter gets a fresh noise number, so two Z's never look alike.</li>
           </ol>
-          <p><b>Unlocking is the same steps backwards.</b> The viewing key gives <var>v</var>, so <var>v·E</var> gives <var>S</var>, then <var>K</var>, then the same stream. XOR twice cancels out:
-            <span class="eq">m = c ⊕ k &nbsp;&nbsp;(66 ⊕ 3C = 5A = Z)</span></p>
-          <p class="aside">Made-up example byte, not the real message. <var>G</var> is a fixed point on the Pallas curve. Finding <var>v</var> from <var>P</var> is believed to be infeasible.</p>
+          <h3>How it unlocks</h3>
+          <ol>
+            <li>Your 16 characters complete the viewing key.</li>
+            <li>The key makes the exact same noise again: <code>3C</code>.</li>
+            <li>Mix again and the noise cancels out:
+              <span class="eq bits">locked 66 = 0110 0110
+noise  3C = 0011 1100
+Z      5A = 0101 1010</span></li>
+          </ol>
+          <p>That's what you see when you press Decrypt: each pair flips back into its letter.</p>
+          <p class="aside">This is a made-up example, not a letter from the real message. How do the sender and the key end up with the same noise without ever talking? Through a trick called <a href="https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange" target="_blank" rel="noopener">Diffie–Hellman</a>: the transaction carries a public hint that only the viewing key can turn into the secret. A 16-byte seal also proves nobody changed a byte.</p>
         </div>
       </span>
     </div>
