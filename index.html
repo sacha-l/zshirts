@@ -39,8 +39,22 @@
 
   #tee svg { width: 100%; height: auto; display: block; border-radius: 10px; }
   .cipher-fallback { margin: 0; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font: 14px/1.8 var(--mono); word-break: break-all; white-space: pre-wrap; }
-  .toggle { appearance: none; background: none; border: 0; padding: 4px 0; align-self: flex-start; color: var(--accent); font: 600 15px/1.4 var(--sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-  .explain { background: var(--accent-soft); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+  /* Info icons: hover (or tap, or focus) to open a bubble that spans the row it sits in. */
+  .tip-row { position: relative; display: flex; align-items: center; gap: 8px; }
+  .tip-label { font-size: 15px; font-weight: 600; color: var(--muted); }
+  .info-btn { appearance: none; position: relative; flex: none; width: 24px; height: 24px; padding: 0; border: 1.5px solid var(--accent); border-radius: 50%; background: var(--card); color: var(--accent); font: italic 700 14px/1 Georgia, "Times New Roman", serif; cursor: help; }
+  .info-btn::after { content: ""; position: absolute; inset: -10px; } /* 44px touch target */
+  .info.open .info-btn { background: var(--accent); color: #fff; }
+  .bubble { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 10px); z-index: 10; flex-direction: column; gap: 10px; padding: 16px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(31, 29, 27, 0.16); font: 400 14px/1.55 var(--sans); text-align: left; }
+  .bubble::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px; } /* keeps hover alive across the gap */
+  .bubble::after { content: ""; position: absolute; top: -7px; left: var(--nub, 16px); width: 12px; height: 12px; background: var(--card); border-left: 1px solid var(--line); border-top: 1px solid var(--line); transform: rotate(45deg); }
+  .info.open .bubble, .info-btn:focus-visible + .bubble { display: flex; }
+  @media (hover: hover) { .info:hover .bubble { display: flex; } }
+  .bubble h3 { margin: 0; font-size: 15px; }
+  .bubble ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .bubble .eq { display: block; margin-top: 3px; padding: 4px 8px; background: var(--accent-soft); border-radius: 5px; font: 13px/1.5 var(--mono); color: var(--ink); overflow-x: auto; white-space: nowrap; }
+  .bubble var { font-family: var(--mono); font-style: normal; font-weight: 700; color: var(--accent); }
+  .bubble .aside { color: var(--muted); font-size: 13px; }
 
   .keyview { font: 13px/1.7 var(--mono); word-break: break-all; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
   .slot { background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: 3px; padding: 0 2px; margin: 0 1px; white-space: pre; }
@@ -94,10 +108,30 @@
   <section id="ciphertext" style="display:flex; flex-direction:column; gap:10px">
     <div id="tee"></div>
     <pre class="cipher-fallback" id="cipher" hidden></pre>
-    <button class="toggle" type="button" data-toggle="what-cipher" aria-expanded="false">What am I looking at?</button>
-    <div class="explain" id="what-cipher" hidden>
-      <p>The characters on the shirt are the message, encrypted, exactly as it sits on the Zcash blockchain. Every pair (like BD) is one letter, scrambled.</p>
-      <p>Without the key it's noise. With the shirt's viewing key, your phone works out this note's secret, unscrambles each byte, and the letters fall back into place.</p>
+    <div class="tip-row">
+      <span class="tip-label">The characters on the shirt are the message</span>
+      <span class="info">
+        <button class="info-btn" type="button" aria-label="How is the message encrypted?" aria-expanded="false" aria-controls="tip-cipher">i</button>
+        <div class="bubble" id="tip-cipher" role="note">
+          <h3>The shirt prints the message, locked</h3>
+          <p>It's printed exactly as it sits on the Zcash blockchain. Every pair of characters is one byte in hex, so one letter. Here's how it got locked:</p>
+          <ol>
+            <li><b>The sender rolls a secret number.</b> Their wallet picks a random <var>e</var> and puts a public hint in the transaction:
+              <span class="eq">E = e·G</span></li>
+            <li><b>Both sides reach the same secret.</b> The shirt's address has a public key <var>P = v·G</var>, where <var>v</var> lives in the viewing key. The sender uses <var>e</var>, the key holder uses <var>v</var>, and they land on the same point:
+              <span class="eq">S = e·P = e·v·G = v·E</span></li>
+            <li><b>That secret becomes a key.</b>
+              <span class="eq">K = BLAKE2b(S, E)</span></li>
+            <li><b>The key becomes a stream of noise.</b> ChaCha20 turns <var>K</var> into random-looking bytes <var>k₁ k₂ k₃ …</var>, and each letter is XORed with one:
+              <span class="eq">c = m ⊕ k</span>
+              <span class="eq">Z = 5A,&nbsp; k = 3C &nbsp;→&nbsp; 5A ⊕ 3C = 66</span></li>
+            <li><b>A seal goes on.</b> A 16-byte tag (Poly1305) proves nobody changed a byte.</li>
+          </ol>
+          <p><b>Unlocking is the same steps backwards.</b> The viewing key gives <var>v</var>, so <var>v·E</var> gives <var>S</var>, then <var>K</var>, then the same stream. XOR twice cancels out:
+            <span class="eq">m = c ⊕ k &nbsp;&nbsp;(66 ⊕ 3C = 5A = Z)</span></p>
+          <p class="aside">Made-up example byte, not the real message. <var>G</var> is a fixed point on the Pallas curve. Finding <var>v</var> from <var>P</var> is believed to be infeasible.</p>
+        </div>
+      </span>
     </div>
   </section>
 
@@ -108,14 +142,31 @@
     </section>
 
     <div id="complete" hidden style="display:flex; flex-direction:column; gap:12px">
-      <h2>Complete the key</h2>
-      <button class="toggle" type="button" data-toggle="what-vk" aria-expanded="false">What's a viewing key?</button>
-      <div class="explain" id="what-vk" hidden>
-        <p>A read-only key to a Zcash address. It can see what that address received (like this message) but it can't spend a single coin.</p>
-        <p>Sharing it is like letting someone read your mail, not open your wallet.</p>
+      <div class="tip-row">
+        <h2>Complete the key</h2>
+        <span class="info">
+          <button class="info-btn" type="button" aria-label="What's a viewing key?" aria-expanded="false" aria-controls="tip-vk">i</button>
+          <div class="bubble" id="tip-vk" role="note">
+            <h3>What's a viewing key?</h3>
+            <p>A read-only key to a Zcash address. It can see what that address received (like this message) but it can't spend a single coin.</p>
+            <p>Sharing it is like letting someone read your mail, not open your wallet.</p>
+          </div>
+        </span>
       </div>
       <div class="keyview" id="keyview" aria-label="The viewing key, with 16 characters missing"></div>
-      <label for="piece">Type the 16 characters printed on the shirt</label>
+      <div class="tip-row">
+        <label for="piece">Type the 16 characters printed on the shirt</label>
+        <span class="info">
+          <button class="info-btn" type="button" aria-label="Why 16 characters?" aria-expanded="false" aria-controls="tip-16">i</button>
+          <div class="bubble" id="tip-16" role="note">
+            <h3>Why 16 characters?</h3>
+            <p>Each character is one of 32, so it carries 5 bits. Sixteen of them make 80 bits.</p>
+            <p>The key ends in a checksum that can confirm your typing, but that also means it gives away 30 of those bits to a guesser:</p>
+            <span class="eq">2<sup>5×16 − 30</sup> = 2<sup>50</sup> ≈ 10<sup>15</sup> keys</span>
+            <p>That's too many to try by hand, so you need the shirt. The same checksum is why one typo gets fixed: the page tries every single-character swap and keeps the only one that fits.</p>
+          </div>
+        </span>
+      </div>
       <input class="piece-input" id="piece" type="text" placeholder="XXXX XXXX XXXX XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-describedby="counter key-msg">
       <span class="counter" id="counter" aria-live="polite">0 / 16</span>
       <p class="msg" id="key-msg" role="status" aria-live="polite"></p>
@@ -404,7 +455,7 @@ async function decrypt() {
   }
 }
 
-// ---- Copy and toggles -----------------------------------------------------------------
+// ---- Copy and info bubbles ----------------------------------------------------------
 
 async function copyField(id, btn) {
   // Split key: the viewing-key field shows only the reader's typing; copy the completed key from memory.
@@ -422,19 +473,36 @@ async function copyField(id, btn) {
   btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1500);
 }
 
-function setupToggles() {
-  document.querySelectorAll("[data-toggle]").forEach((btn) => {
-    btn.setAttribute("aria-controls", btn.dataset.toggle);
-    btn.addEventListener("click", () => {
-      const open = btn.getAttribute("aria-expanded") !== "true";
-      btn.setAttribute("aria-expanded", String(open));
-      $(btn.dataset.toggle).hidden = !open;
+// Info bubbles open on hover (CSS) and stay open on click or tap, for phones.
+function setupInfo() {
+  const tips = [...document.querySelectorAll(".info")];
+  const setOpen = (tip, open) => {
+    tip.classList.toggle("open", open);
+    tip.querySelector(".info-btn").setAttribute("aria-expanded", String(open));
+  };
+  // Point the bubble's nub at its icon.
+  const aim = (tip) => {
+    const btn = tip.querySelector(".info-btn");
+    tip.querySelector(".bubble").style.setProperty("--nub", `${btn.offsetLeft + btn.offsetWidth / 2 - 6}px`);
+  };
+  for (const tip of tips) {
+    const btn = tip.querySelector(".info-btn");
+    tip.addEventListener("pointerenter", () => aim(tip));
+    btn.addEventListener("focus", () => aim(tip));
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      aim(tip);
+      const open = !tip.classList.contains("open");
+      tips.forEach((t) => setOpen(t, false));
+      setOpen(tip, open);
     });
-  });
+  }
+  document.addEventListener("click", (e) => { if (!e.target.closest(".bubble")) tips.forEach((t) => setOpen(t, false)); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") tips.forEach((t) => setOpen(t, false)); });
 }
 
 (async () => {
-  setupToggles();
+  setupInfo();
   $("go").addEventListener("click", decrypt);
   $("retry").addEventListener("click", decrypt);
   document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => copyField(b.dataset.copy, b)));
